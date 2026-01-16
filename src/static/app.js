@@ -4,6 +4,36 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
+  // Function to unregister a participant
+  async function unregisterParticipant(activityName, participantEmail) {
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(participantEmail)}`,
+        {
+          method: "POST",
+        }
+      );
+
+      if (response.ok) {
+        // Refresh activities list after successful unregistration
+        fetchActivities();
+        messageDiv.textContent = `${participantEmail} has been unregistered.`;
+        messageDiv.className = "success";
+        messageDiv.classList.remove("hidden");
+      } else {
+        const result = await response.json();
+        messageDiv.textContent = result.detail || "Failed to unregister participant";
+        messageDiv.className = "error";
+        messageDiv.classList.remove("hidden");
+      }
+    } catch (error) {
+      messageDiv.textContent = "Error unregistering participant";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      console.error("Error unregistering participant:", error);
+    }
+  }
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
@@ -19,13 +49,32 @@ document.addEventListener("DOMContentLoaded", () => {
         activityCard.className = "activity-card";
 
         const spotsLeft = details.max_participants - details.participants.length;
+        const participantsList = details.participants.length > 0 
+          ? `<ul class="participants-list">${details.participants.map(p => `<li>${p} <span class="delete-participant" data-activity="${name}" data-participant="${p}" style="cursor: pointer; font-size: 0.9em;">🗑️</span></li>`).join('')}</ul>`
+          : '<p class="no-participants"><em>No participants yet</em></p>';
 
         activityCard.innerHTML = `
-          <h4>${name}</h4>
+          <div class="activity-header">
+            <h4>${name}</h4>
+          </div>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants-section">
+            <p><strong>Signed Up:</strong></p>
+            ${participantsList}
+          </div>
         `;
+
+        // Add click handlers to participant delete icons
+        const deleteIcons = activityCard.querySelectorAll('.delete-participant');
+        deleteIcons.forEach(icon => {
+          icon.addEventListener('click', () => {
+            const activity = icon.getAttribute('data-activity');
+            const participant = icon.getAttribute('data-participant');
+            unregisterParticipant(activity, participant);
+          });
+        });
 
         activitiesList.appendChild(activityCard);
 
@@ -62,6 +111,8 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        // Refresh activities list to show the new participant
+        fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
